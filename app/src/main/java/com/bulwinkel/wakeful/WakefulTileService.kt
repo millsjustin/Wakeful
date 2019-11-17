@@ -1,14 +1,16 @@
 package com.bulwinkel.wakeful
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_UPDATE_CURRENT
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.BitmapFactory
 import android.graphics.drawable.Icon
+import android.os.Build
 import android.os.PowerManager
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
@@ -22,6 +24,7 @@ class WakefulTileService : TileService() {
   private val ID_DONE_INTENT = 1001
   private val ACTION_STAY_ALIVE = "ACTION_STAY_ALIVE"
   private val ACTION_ALLOW_SLEEP = "ACTION_ALLOW_SLEEP"
+  private val NOTIFICATION_CHANNEL_NAME = "Wakeful"
 
   private val powerManager by lazy { getSystemService(Context.POWER_SERVICE) as PowerManager }
   private val wakelock by lazy { powerManager.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "Wakeful") }
@@ -116,7 +119,18 @@ class WakefulTileService : TileService() {
     return super.onStartCommand(intent, flags, startId)
   }
 
+  private fun createNotificationChannel() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val name = NOTIFICATION_CHANNEL_NAME
+      val importance = NotificationManager.IMPORTANCE_DEFAULT
+      val mChannel = NotificationChannel(name, name, importance)
+      val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+      notificationManager.createNotificationChannel(mChannel)
+    }
+  }
+
   private fun showNotification() {
+    createNotificationChannel()
 
     val title = getString(R.string.notification_title)
 
@@ -125,11 +139,17 @@ class WakefulTileService : TileService() {
 
     val doneAction = Notification.Action.Builder(null, "Allow sleep", donePendingIntent).build()
 
-    val builder = Notification.Builder(this)
-        .setSmallIcon(R.drawable.ic_notification_active)
-        .setContentTitle(title)
-        .setContentText(getString(R.string.notification_content))
-        .setActions(doneAction)
+    val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      Notification.Builder(this, NOTIFICATION_CHANNEL_NAME)
+    } else {
+      Notification.Builder(this)
+    }
+
+    builder
+      .setSmallIcon(R.drawable.ic_notification_active)
+      .setContentTitle(title)
+      .setContentText(getString(R.string.notification_content))
+      .setActions(doneAction)
 
     startForeground(ID_NOTIFICATION, builder.build())
   }
